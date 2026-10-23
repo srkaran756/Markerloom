@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  --surface: #f8f9ff;
+  --on-surface: #0d1c2e;
+  --primary: #253481;
+  --primary-container: #3e4c9a;
+  --secondary: #515e7c;
+  --tertiary: #005e4b;
+  --outline: #767682;
+  --outline-variant: #e2e8f0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--surface);
+  color: var(--on-surface);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
