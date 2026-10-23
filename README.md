@@ -1,6 +1,6 @@
-# Boardwise
+# Markerloom
 
-A new project initialized at `F:\Boardwise`.
+A new project initialized at `F:\Markerloom`.
 
 ## Overview
 Technology stack and project architecture will be decided as development begins.
