@@ -14,8 +14,8 @@
     "test:watch": "vitest"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Shivamraj Karan",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "next": "^16.4.3",
     "perfect-freehand": "^1.2.3",

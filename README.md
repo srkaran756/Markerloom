@@ -3,7 +3,7 @@
 > **Smooth Handwriting & Annotation Engine** for high-performance interactive whiteboards and educational canvas workflows.
 
 [![Status: Ongoing Development](https://img.shields.io/badge/Status-Ongoing%20Development-orange?style=for-the-badge&logo=git)](https://github.com/srkaran756/Markerloom)
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue?style=for-the-badge)](LICENSE)
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)](LICENSE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.4-black?style=for-the-badge&logo=next.dot.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Vitest](https://img.shields.io/badge/Tested%20with-Vitest-green?style=for-the-badge&logo=vitest)](https://vitest.dev/)
@@ -96,4 +96,9 @@ npm run test
 
 ## 📄 License
 
-This project is licensed under the [ISC License](LICENSE).
+This project is licensed under the **PolyForm Noncommercial License 1.0.0** (Non-Commercial / Restricted from Commercial Sale).
+
+- ✅ **Free for personal, educational, and non-commercial research use.**
+- ❌ **Commercial sale, commercial hosting (SaaS), closed-source commercial distribution, or monetized offerings are strictly prohibited** without prior written permission from the author.
+
+See the full terms in the [LICENSE](LICENSE) file. For commercial inquiries, please contact the repository owner.
