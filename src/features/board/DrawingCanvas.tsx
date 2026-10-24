@@ -14,12 +14,15 @@ import type {
   RawPoint,
   StrokePoint,
   Camera,
+  ShapeType,
+  ToolType,
 } from './types';
 import { isValidStroke } from './types';
 import {
   renderStroke,
   renderActiveStroke,
   isStrokeHitByEraser,
+  isStrokeNormalized,
   screenToWorld,
   zoomAroundPivot,
   getNextStepZoom,
@@ -46,6 +49,12 @@ export interface DrawingCanvasHandle {
 }
 
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 1.0 };
+
+function getShapeForTool(tool: ToolType): ShapeType | undefined {
+  return tool === 'rectangle' || tool === 'ellipse' || tool === 'line' || tool === 'arrow'
+    ? tool
+    : undefined;
+}
 
 /**
  * Excalidraw-style Infinite Canvas with:
@@ -371,7 +380,8 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         propsRef.current.color,
         propsRef.current.brushSize,
         propsRef.current.strokeConfig,
-        isPenPointerRef.current
+        isPenPointerRef.current,
+        getShapeForTool(currentTool)
       );
     }, []);
 
@@ -458,6 +468,50 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         } else {
           internalHistory.eraseStrokes(erasedIdsRef.current);
         }
+      }
+    }, [internalHistory]);
+
+    const applyBucketFill = useCallback((x: number, y: number) => {
+      const { width, height } = dimensionsRef.current;
+      const candidates = spatialGridRef.current.query({
+        minX: x - 1,
+        minY: y - 1,
+        maxX: x + 1,
+        maxY: y + 1,
+      });
+      const order = new Map(strokesRef.current.map((stroke, index) => [stroke.id, index]));
+      candidates.sort((a, b) => (order.get(b.id) ?? -1) - (order.get(a.id) ?? -1));
+
+      const target = candidates.find((stroke) => {
+        if (stroke.shape !== 'rectangle' && stroke.shape !== 'ellipse') return false;
+        if (stroke.points.length !== 2) return false;
+        const normalized =
+          width > 0 && height > 0 && isStrokeNormalized(stroke);
+        const scaleX = normalized ? width : 1;
+        const scaleY = normalized ? height : 1;
+        const [first, second] = stroke.points;
+        const left = Math.min(first.x * scaleX, second.x * scaleX);
+        const right = Math.max(first.x * scaleX, second.x * scaleX);
+        const top = Math.min(first.y * scaleY, second.y * scaleY);
+        const bottom = Math.max(first.y * scaleY, second.y * scaleY);
+        if (x < left || x > right || y < top || y > bottom) return false;
+        if (stroke.shape === 'rectangle') return true;
+        const radiusX = (right - left) / 2;
+        const radiusY = (bottom - top) / 2;
+        if (radiusX === 0 || radiusY === 0) return false;
+        const dx = (x - (left + right) / 2) / radiusX;
+        const dy = (y - (top + bottom) / 2) / radiusY;
+        return dx * dx + dy * dy <= 1;
+      });
+
+      if (!target || target.fillColor === propsRef.current.color) return;
+      const nextStrokes = strokesRef.current.map((stroke) =>
+        stroke.id === target.id ? { ...stroke, fillColor: propsRef.current.color } : stroke
+      );
+      if (propsRef.current.isControlled) {
+        propsRef.current.onStrokesChange?.(nextStrokes);
+      } else {
+        internalHistory.setStrokes(nextStrokes);
       }
     }, [internalHistory]);
 
@@ -618,6 +672,12 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (activePointerIdRef.current !== null) return;
 
+        if (propsRef.current.tool === 'bucket') {
+          const coord = getPointerCoordinates(e);
+          applyBucketFill(coord.worldX, coord.worldY);
+          return;
+        }
+
         const canvas = activeCanvasRef.current;
         if (!canvas) return;
 
@@ -647,7 +707,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
 
         scheduleRenderActive();
       },
-      [getPointerCoordinates, isSpacePressed, isZKeyPressed, processEraserSamples, scheduleRenderActive]
+      [applyBucketFill, getPointerCoordinates, isSpacePressed, isZKeyPressed, processEraserSamples, scheduleRenderActive]
     );
 
     const handlePointerMove = useCallback(
@@ -813,7 +873,11 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         // Pen or Highlighter stroke commit: store pure world coordinates
         const rawPoints = activePointsRef.current;
         if (rawPoints.length > 0 && w > 0 && h > 0) {
-          const points: StrokePoint[] = rawPoints.map((p) => ({
+          const shape = getShapeForTool(currentTool);
+          const committedPoints = shape
+            ? [rawPoints[0], rawPoints[rawPoints.length - 1]]
+            : rawPoints;
+          const points: StrokePoint[] = committedPoints.map((p) => ({
             x: p.x,
             y: p.y,
             pressure: p.pressure,
@@ -829,6 +893,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
             color: propsRef.current.color,
             size: propsRef.current.brushSize,
             points,
+            ...(shape ? { shape } : {}),
             createdAt: Date.now(),
           };
           (newStroke as unknown as { normalized: boolean }).normalized = false;
@@ -892,11 +957,15 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         // If stroke was in progress with active points, commit it so strokes are never deleted!
         const rawPoints = activePointsRef.current;
         const currentTool = propsRef.current.tool;
+        const shape = getShapeForTool(currentTool);
         if (
-          (currentTool === 'pen' || currentTool === 'highlighter') &&
+          (currentTool === 'pen' || currentTool === 'highlighter' || shape) &&
           rawPoints.length > 0
         ) {
-          const points: StrokePoint[] = rawPoints.map((p) => ({
+          const committedPoints = shape
+            ? [rawPoints[0], rawPoints[rawPoints.length - 1]]
+            : rawPoints;
+          const points: StrokePoint[] = committedPoints.map((p) => ({
             x: p.x,
             y: p.y,
             pressure: p.pressure,
@@ -912,6 +981,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
             color: propsRef.current.color,
             size: propsRef.current.brushSize,
             points,
+            ...(shape ? { shape } : {}),
             createdAt: Date.now(),
           };
           (newStroke as unknown as { normalized: boolean }).normalized = false;

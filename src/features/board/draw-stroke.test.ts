@@ -254,6 +254,44 @@ describe('Rendering Helpers', () => {
     expect(mockCtx.fillStyle).toBe('#ffff00');
   });
 
+  it('renders filled rectangle and ellipse shapes', () => {
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      ellipse: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
+      lineCap: 'round',
+      lineJoin: 'round',
+    } as unknown as CanvasRenderingContext2D;
+    const rectangle: Stroke = {
+      id: 'shape-rect',
+      tool: 'pen',
+      shape: 'rectangle',
+      color: '#253481',
+      fillColor: '#ba1a1a',
+      size: 4,
+      points: [
+        { x: 10, y: 20, pressure: 0.5 },
+        { x: 60, y: 50, pressure: 0.5 },
+      ],
+    };
+
+    renderStroke(mockCtx, rectangle, 800, 600);
+    expect(mockCtx.rect).toHaveBeenCalledWith(10, 20, 50, 30);
+    expect(mockCtx.fillStyle).toBe('#ba1a1a');
+    expect(mockCtx.stroke).toHaveBeenCalled();
+
+    const ellipse: Stroke = { ...rectangle, id: 'shape-ellipse', shape: 'ellipse' };
+    renderStroke(mockCtx, ellipse, 800, 600);
+    expect(mockCtx.ellipse).toHaveBeenCalledWith(35, 35, 25, 15, 0, 0, Math.PI * 2);
+  });
+
   it('renders active stroke safely with single point and multiple points', () => {
     const mockCtx = {
       save: vi.fn(),
@@ -465,4 +503,3 @@ describe('Infinite Canvas Camera Transformations', () => {
     });
   });
 });
-

@@ -5,6 +5,7 @@ import type {
   StrokePoint,
   RawPoint,
   ToolType,
+  ShapeType,
   StrokeConfig,
   Camera,
   BoundingBox,
@@ -207,6 +208,55 @@ export function drawSmoothOutline(
   ctx.fill();
 }
 
+function drawShape(
+  ctx: CanvasRenderingContext2D,
+  shape: ShapeType,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  color: string,
+  size: number,
+  fillColor?: string
+): void {
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  const width = Math.abs(end.x - start.x);
+  const height = Math.abs(end.y - start.y);
+
+  ctx.beginPath();
+  if (shape === 'rectangle') {
+    ctx.rect(left, top, width, height);
+  } else if (shape === 'ellipse') {
+    ctx.ellipse(left + width / 2, top + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+  } else {
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    if (shape === 'arrow') {
+      const angle = Math.atan2(end.y - start.y, end.x - start.x);
+      const headLength = Math.max(10, size * 3);
+      ctx.moveTo(end.x, end.y);
+      ctx.lineTo(
+        end.x - headLength * Math.cos(angle - Math.PI / 6),
+        end.y - headLength * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.moveTo(end.x, end.y);
+      ctx.lineTo(
+        end.x - headLength * Math.cos(angle + Math.PI / 6),
+        end.y - headLength * Math.sin(angle + Math.PI / 6)
+      );
+    }
+  }
+
+  if (fillColor && (shape === 'rectangle' || shape === 'ellipse')) {
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
 /**
  * Renders a single-point tap as a round dot.
  */
@@ -238,6 +288,12 @@ export function renderStrokeWorld(
   if (stroke.points.length === 0) return;
 
   ctx.save();
+  if (stroke.shape) {
+    const [start, end] = stroke.points;
+    drawShape(ctx, stroke.shape, start, end, stroke.color, stroke.size, stroke.fillColor);
+    ctx.restore();
+    return;
+  }
 
   if (stroke.tool === 'highlighter') {
     ctx.globalAlpha = 0.35;
@@ -333,6 +389,20 @@ export function renderStroke(
   }
 
   ctx.save();
+  if (stroke.shape) {
+    const [start, end] = stroke.points;
+    drawShape(
+      ctx,
+      stroke.shape,
+      { x: start.x * canvasWidth, y: start.y * canvasHeight },
+      { x: end.x * canvasWidth, y: end.y * canvasHeight },
+      stroke.color,
+      stroke.size,
+      stroke.fillColor
+    );
+    ctx.restore();
+    return;
+  }
 
   if (stroke.tool === 'highlighter') {
     ctx.globalAlpha = 0.35;
@@ -388,11 +458,19 @@ export function renderActiveStroke(
   color: string,
   brushSize: number,
   config?: Partial<StrokeConfig>,
-  isPenPointer: boolean = false
+  isPenPointer: boolean = false,
+  shape?: ShapeType
 ): void {
   if (rawPoints.length === 0) return;
 
   ctx.save();
+  if (shape) {
+    const start = rawPoints[0];
+    const end = rawPoints[rawPoints.length - 1];
+    drawShape(ctx, shape, start, end, color, brushSize);
+    ctx.restore();
+    return;
+  }
 
   if (tool === 'highlighter') {
     ctx.globalAlpha = 0.35;
@@ -476,6 +554,51 @@ export function isStrokeHitByEraser(
 
   const strokeMargin = (stroke.tool === 'highlighter' ? stroke.size * 2.2 : stroke.size) / 2;
   const hitThreshold = strokeMargin + eraserRadius;
+  let pathPoints = points;
+  let isClosedPath = false;
+  if (stroke.shape && points.length === 2) {
+    const [[x1, y1], [x2, y2]] = points;
+    if (stroke.shape === 'rectangle' || stroke.shape === 'ellipse') {
+      isClosedPath = true;
+      if (stroke.shape === 'rectangle') {
+        pathPoints = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]];
+      } else {
+        const centerX = (x1 + x2) / 2;
+        const centerY = (y1 + y2) / 2;
+        const radiusX = Math.abs(x2 - x1) / 2;
+        const radiusY = Math.abs(y2 - y1) / 2;
+        pathPoints = Array.from({ length: 48 }, (_, index) => {
+          const angle = (index / 48) * Math.PI * 2;
+          return [centerX + Math.cos(angle) * radiusX, centerY + Math.sin(angle) * radiusY];
+        });
+        if (stroke.fillColor && radiusX > 0 && radiusY > 0) {
+          for (const sample of eraserSamples) {
+            const dx = (sample.x - centerX) / radiusX;
+            const dy = (sample.y - centerY) / radiusY;
+            if (dx * dx + dy * dy <= 1) return true;
+          }
+        }
+      }
+      if (stroke.fillColor && stroke.shape === 'rectangle') {
+        for (const sample of eraserSamples) {
+          if (sample.x >= Math.min(x1, x2) && sample.x <= Math.max(x1, x2) &&
+              sample.y >= Math.min(y1, y2) && sample.y <= Math.max(y1, y2)) {
+            return true;
+          }
+        }
+      }
+    } else if (stroke.shape === 'arrow') {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const headLength = Math.max(10, stroke.size * 3);
+      pathPoints = [
+        [x1, y1],
+        [x2, y2],
+        [x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6)],
+        [x2, y2],
+        [x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6)],
+      ];
+    }
+  }
 
   // 1. Compute Stroke AABB
   let minSX = Infinity;
@@ -483,8 +606,8 @@ export function isStrokeHitByEraser(
   let maxSX = -Infinity;
   let maxSY = -Infinity;
 
-  for (let i = 0; i < points.length; i++) {
-    const [x, y] = points[i];
+  for (let i = 0; i < pathPoints.length; i++) {
+    const [x, y] = pathPoints[i];
     if (x < minSX) minSX = x;
     if (y < minSY) minSY = y;
     if (x > maxSX) maxSX = x;
@@ -521,8 +644,8 @@ export function isStrokeHitByEraser(
   }
 
   // 3. Exact geometric distance test
-  if (points.length === 1) {
-    const [sx, sy] = points[0];
+  if (pathPoints.length === 1) {
+    const [sx, sy] = pathPoints[0];
     for (let j = 0; j < eraserSamples.length; j++) {
       const { x: ex, y: ey } = eraserSamples[j];
       const dx = sx - ex;
@@ -534,9 +657,10 @@ export function isStrokeHitByEraser(
     return false;
   }
 
-  for (let i = 0; i < points.length - 1; i++) {
-    const [ax, ay] = points[i];
-    const [bx, by] = points[i + 1];
+  const segmentCount = pathPoints.length - 1 + Number(isClosedPath);
+  for (let i = 0; i < segmentCount; i++) {
+    const [ax, ay] = pathPoints[i];
+    const [bx, by] = pathPoints[(i + 1) % pathPoints.length];
 
     for (let j = 0; j < eraserSamples.length; j++) {
       const { x: ex, y: ey } = eraserSamples[j];

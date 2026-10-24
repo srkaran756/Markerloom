@@ -41,7 +41,10 @@ export function getStrokeBounds(
     if (y > maxY) maxY = y;
   }
 
-  const padding = (stroke.tool === 'highlighter' ? stroke.size * 2.2 : stroke.size) / 2 + 2;
+  const padding =
+    (stroke.tool === 'highlighter' ? stroke.size * 2.2 : stroke.size) / 2 +
+    2 +
+    (stroke.shape === 'arrow' ? Math.max(10, stroke.size * 3) : 0);
   return {
     minX: minX - padding,
     minY: minY - padding,

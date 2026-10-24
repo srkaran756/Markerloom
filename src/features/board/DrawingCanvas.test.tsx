@@ -129,6 +129,88 @@ describe('DrawingCanvas Component', () => {
     expect(onStrokesChange.mock.calls[0][0]).toEqual([completedStroke]);
   });
 
+  it('creates a rectangle shape from drag start and end points', () => {
+    const onStrokeComplete = vi.fn();
+    const { getByTestId } = render(
+      <DrawingCanvas width={800} height={600} tool="rectangle" onStrokeComplete={onStrokeComplete} />
+    );
+    const activeCanvas = getByTestId('active-canvas');
+
+    act(() => {
+      fireEvent.pointerDown(activeCanvas, {
+        pointerId: 11,
+        isPrimary: true,
+        button: 0,
+        clientX: 100,
+        clientY: 120,
+      });
+      fireEvent.pointerMove(activeCanvas, {
+        pointerId: 11,
+        isPrimary: true,
+        clientX: 240,
+        clientY: 220,
+      });
+      fireEvent.pointerUp(activeCanvas, {
+        pointerId: 11,
+        isPrimary: true,
+        clientX: 240,
+        clientY: 220,
+      });
+    });
+
+    expect(onStrokeComplete).toHaveBeenCalledTimes(1);
+    expect(onStrokeComplete.mock.calls[0][0]).toMatchObject({
+      tool: 'pen',
+      shape: 'rectangle',
+      points: [
+        { x: 100, y: 120 },
+        { x: 240, y: 220 },
+      ],
+    });
+  });
+
+  it('fills the topmost closed shape under the bucket with the selected color', () => {
+    const shape: Stroke = {
+      id: 'rectangle',
+      tool: 'pen',
+      shape: 'rectangle',
+      color: '#253481',
+      size: 4,
+      points: [
+        { x: 100, y: 100, pressure: 0.5 },
+        { x: 200, y: 200, pressure: 0.5 },
+      ],
+    };
+    const onStrokesChange = vi.fn();
+    const { getByTestId } = render(
+      <DrawingCanvas
+        width={800}
+        height={600}
+        tool="bucket"
+        color="#ba1a1a"
+        initialStrokes={[shape]}
+        onStrokesChange={onStrokesChange}
+      />
+    );
+    const activeCanvas = getByTestId('active-canvas');
+
+    act(() => {
+      fireEvent.pointerDown(activeCanvas, {
+        pointerId: 12,
+        isPrimary: true,
+        button: 0,
+        clientX: 150,
+        clientY: 150,
+      });
+    });
+
+    expect(onStrokesChange).toHaveBeenCalledTimes(1);
+    expect(onStrokesChange.mock.calls[0][0][0]).toMatchObject({
+      id: 'rectangle',
+      fillColor: '#ba1a1a',
+    });
+  });
+
   it('captures pointer on pointerDown and safely falls back for coalesced events', () => {
     const setPointerCapture = vi.fn();
     const releasePointerCapture = vi.fn();

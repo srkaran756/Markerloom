@@ -2,7 +2,8 @@
  * Tool types supported by Markerloom board engine.
  * 'hand' is a panning navigation tool.
  */
-export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'hand';
+export type ShapeType = 'rectangle' | 'ellipse' | 'line' | 'arrow';
+export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'hand' | ShapeType | 'bucket';
 
 /**
  * Camera / Viewport state for infinite canvas navigation.
@@ -54,6 +55,8 @@ export interface Stroke {
   color: string;
   size: number; // Logical brush size in world units
   points: StrokePoint[];
+  shape?: ShapeType;
+  fillColor?: string;
   createdAt?: number;
 }
 
@@ -139,6 +142,21 @@ export function isValidStroke(stroke: unknown): stroke is Stroke {
     return false;
   }
   if (s.tool !== 'pen' && s.tool !== 'highlighter' && s.tool !== 'eraser') {
+    return false;
+  }
+  if (
+    s.shape !== undefined &&
+    s.shape !== 'rectangle' &&
+    s.shape !== 'ellipse' &&
+    s.shape !== 'line' &&
+    s.shape !== 'arrow'
+  ) {
+    return false;
+  }
+  if (s.shape !== undefined && (!Array.isArray(s.points) || s.points.length !== 2)) {
+    return false;
+  }
+  if (s.fillColor !== undefined && (typeof s.fillColor !== 'string' || s.fillColor.trim().length === 0)) {
     return false;
   }
   if (typeof s.color !== 'string' || s.color.trim().length === 0) {
