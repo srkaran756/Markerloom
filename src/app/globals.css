@@ -21,3 +21,230 @@ body {
   user-select: none;
   -webkit-user-select: none;
 }
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  touch-action: manipulation;
+}
+
+.zoom-controls {
+  top: 16px !important;
+  right: 20px !important;
+  bottom: auto !important;
+  left: auto !important;
+  align-items: flex-end !important;
+}
+
+.toolbar-clear {
+  display: flex !important;
+  flex: 0 0 auto;
+  visibility: visible !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    top: max(10px, env(safe-area-inset-top)) !important;
+    left: 10px !important;
+    gap: 8px !important;
+    max-width: calc(100vw - 20px);
+    padding: 7px 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .app-header > div:first-child {
+    gap: 7px !important;
+  }
+
+  .app-header img {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .app-header span:nth-child(2) {
+    font-size: 14px !important;
+  }
+
+  .app-header span:nth-child(3),
+  .app-header > div:nth-child(2) {
+    display: none;
+  }
+
+  .zoom-controls {
+    top: auto !important;
+    right: 10px !important;
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 150px) !important;
+    left: auto !important;
+    align-items: flex-end !important;
+  }
+
+  .zoom-menu {
+    max-height: max(80px, calc(100dvh - 220px));
+    overflow-y: auto;
+  }
+
+  .zoom-pill {
+    gap: 2px !important;
+    padding: 3px 4px !important;
+  }
+
+  .zoom-pill > button {
+    min-width: 34px !important;
+    min-height: 34px !important;
+  }
+
+  .canvas-empty-state {
+    width: min(100% - 32px, 360px);
+    gap: 8px !important;
+    transform: translate(-50%, -58%) !important;
+    text-align: center;
+  }
+
+  .canvas-empty-state > img {
+    width: 52px !important;
+    height: 52px !important;
+  }
+
+  .canvas-empty-state h2 {
+    font-size: 19px !important;
+  }
+
+  .empty-state-caption {
+    max-width: 280px;
+    font-size: 12px !important;
+    line-height: 1.45;
+  }
+
+  .empty-state-shortcuts {
+    display: none !important;
+  }
+
+  .whiteboard-toolbar {
+    right: max(8px, env(safe-area-inset-right)) !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
+    width: auto;
+    max-width: 520px;
+    margin: 0 auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px !important;
+    padding: 7px 8px !important;
+    border-radius: 16px !important;
+  }
+
+  .toolbar-tools {
+    flex: 0 0 100%;
+    justify-content: center;
+    gap: 2px !important;
+  }
+
+  .toolbar-tool {
+    width: 42px;
+    height: 40px;
+    justify-content: center;
+    padding: 6px !important;
+  }
+
+  .toolbar-tool span {
+    display: none;
+  }
+
+  .toolbar-divider {
+    display: none;
+  }
+
+  .toolbar-palette {
+    gap: 5px !important;
+  }
+
+  .toolbar-palette button {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .toolbar-brush-size {
+    gap: 4px !important;
+  }
+
+  .toolbar-brush-size input {
+    width: 56px !important;
+    height: 32px;
+  }
+
+  .toolbar-history {
+    gap: 2px !important;
+  }
+
+  .toolbar-history button {
+    min-width: 38px !important;
+    min-height: 38px !important;
+  }
+
+  .toolbar-history button:last-child {
+    padding: 6px 9px !important;
+  }
+
+  .toolbar-clear {
+    min-width: 52px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .app-header > span:last-child {
+    font-size: 11px !important;
+  }
+
+  .whiteboard-toolbar {
+    gap: 3px !important;
+    padding: 6px !important;
+  }
+
+  .toolbar-tool {
+    width: 38px;
+  }
+
+  .toolbar-history button:last-child {
+    padding: 5px 7px !important;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 900px) {
+  .zoom-controls {
+    top: max(10px, env(safe-area-inset-top)) !important;
+    right: 10px !important;
+    bottom: auto !important;
+    left: auto !important;
+    align-items: flex-end !important;
+  }
+
+  .zoom-menu {
+    max-height: min(60dvh, 420px);
+  }
+
+  .whiteboard-toolbar {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    max-width: calc(100vw - 16px);
+    scrollbar-width: none;
+  }
+
+  .whiteboard-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-tools {
+    flex: 0 0 auto;
+  }
+
+  .canvas-empty-state {
+    display: none !important;
+  }
+}

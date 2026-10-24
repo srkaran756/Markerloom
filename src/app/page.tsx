@@ -152,16 +152,18 @@ export default function WhiteboardPage() {
 
   return (
     <main
+      className="whiteboard-app"
       style={{
         position: 'relative',
-        width: '100vw',
-        height: '100vh',
+        width: '100%',
+        height: '100dvh',
         backgroundColor: '#ffffff',
         overflow: 'hidden',
       }}
     >
       {/* Top Header Navigation */}
       <header
+        className="app-header"
         style={{
           position: 'absolute',
           top: 16,
@@ -216,6 +218,7 @@ export default function WhiteboardPage() {
 
       {/* Floating Bottom Left: Zoom & Vertical Control Tools */}
       <div
+        className="zoom-controls"
         ref={zoomMenuRef}
         style={{
           position: 'absolute',
@@ -231,6 +234,7 @@ export default function WhiteboardPage() {
         {/* Figma-Style Vertical Zoom Menu Popover */}
         {isZoomMenuOpen && (
           <div
+            className="zoom-menu"
             style={{
               padding: 12,
               backgroundColor: '#ffffff',
@@ -329,6 +333,7 @@ export default function WhiteboardPage() {
 
         {/* Floating Bottom Left Pill Bar */}
         <div
+          className="zoom-pill"
           aria-label="Zoom Controls"
           style={{
             display: 'flex',
@@ -457,6 +462,7 @@ export default function WhiteboardPage() {
       {/* Canvas Center Branding Watermark (Empty State) */}
       {strokeCount === 0 && (
         <div
+          className="canvas-empty-state"
           data-testid="canvas-empty-state"
           style={{
             position: 'absolute',
@@ -500,6 +506,7 @@ export default function WhiteboardPage() {
               Markerloom
             </h2>
             <p
+              className="empty-state-caption"
               style={{
                 fontSize: 13,
                 color: '#515e7c',
@@ -511,6 +518,7 @@ export default function WhiteboardPage() {
             </p>
           </div>
           <div
+            className="empty-state-shortcuts"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -539,6 +547,7 @@ export default function WhiteboardPage() {
 
       {/* Floating Center Dock: Tools, Palettes, History */}
       <nav
+        className="whiteboard-toolbar"
         aria-label="Whiteboard Toolbar"
         style={{
           position: 'absolute',
@@ -558,10 +567,12 @@ export default function WhiteboardPage() {
         }}
       >
         {/* Navigation & Drawing Tool Group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="toolbar-tools" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {/* Hand Tool */}
           <button
             type="button"
+            aria-label="Hand tool"
+            className="toolbar-tool"
             title="Hand / Pan Tool (Space or 4)"
             onClick={() => setTool('hand')}
             style={{
@@ -585,12 +596,14 @@ export default function WhiteboardPage() {
               <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
               <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
             </svg>
-            Hand
+            <span>Hand</span>
           </button>
 
           {/* Pen Tool */}
           <button
             type="button"
+            aria-label="Pen tool"
+            className="toolbar-tool"
             title="Pen (1 or P)"
             onClick={() => setTool('pen')}
             style={{
@@ -614,12 +627,14 @@ export default function WhiteboardPage() {
               <path d="M2 2l7.586 7.586" />
               <circle cx="11" cy="11" r="2" />
             </svg>
-            Pen
+            <span>Pen</span>
           </button>
 
           {/* Highlighter Tool */}
           <button
             type="button"
+            aria-label="Highlighter tool"
+            className="toolbar-tool"
             title="Highlighter (2 or H)"
             onClick={() => setTool('highlighter')}
             style={{
@@ -641,12 +656,14 @@ export default function WhiteboardPage() {
               <path d="m9 11-6 6v3h3l6-6" />
               <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />
             </svg>
-            Highlighter
+            <span>Highlighter</span>
           </button>
 
           {/* Eraser Tool */}
           <button
             type="button"
+            aria-label="Eraser tool"
+            className="toolbar-tool"
             title="Eraser (3 or E)"
             onClick={() => setTool('eraser')}
             style={{
@@ -669,16 +686,16 @@ export default function WhiteboardPage() {
               <path d="M22 21H7" />
               <path d="m5 11 9 9" />
             </svg>
-            Eraser
+            <span>Eraser</span>
           </button>
         </div>
 
-        <div style={{ width: 1, height: 20, backgroundColor: '#e2e8f0' }} />
+        <div className="toolbar-divider" style={{ width: 1, height: 20, backgroundColor: '#e2e8f0' }} />
 
         {/* Color swatches */}
         {tool !== 'eraser' && tool !== 'hand' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="toolbar-palette" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {EDUCATIONAL_COLORS.map((c) => {
                 const isSelected = color === c.value;
                 return (
@@ -703,14 +720,14 @@ export default function WhiteboardPage() {
                 );
               })}
             </div>
-            <div style={{ width: 1, height: 20, backgroundColor: '#e2e8f0' }} />
+            <div className="toolbar-divider" style={{ width: 1, height: 20, backgroundColor: '#e2e8f0' }} />
           </>
         )}
 
         {/* Thickness slider */}
         {tool !== 'hand' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px' }}>
+            <div className="toolbar-brush-size" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#515e7c', minWidth: 26 }}>
                 {brushSize}px
               </span>
@@ -727,12 +744,12 @@ export default function WhiteboardPage() {
                 }}
               />
             </div>
-            <div style={{ width: 1, height: 20, backgroundColor: '#e2e8f0' }} />
+            <div className="toolbar-divider" style={{ width: 1, height: 20, backgroundColor: '#e2e8f0' }} />
           </>
         )}
 
         {/* History actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="toolbar-history" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
             type="button"
             title="Undo (Ctrl Z)"
@@ -785,6 +802,7 @@ export default function WhiteboardPage() {
 
           <button
             type="button"
+            className="toolbar-clear"
             title="Clear board"
             onClick={handleClear}
             style={{
