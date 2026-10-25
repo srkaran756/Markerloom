@@ -25,6 +25,93 @@ export default function WhiteboardPage() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1.0 });
+  const [isAutoShapeEnabled, setIsAutoShapeEnabled] = useState(true);
+
+  // Groq Vision AI State & Configuration
+  const [isGroqSettingsOpen, setIsGroqSettingsOpen] = useState(false);
+  const [groqApiKey, setGroqApiKey] = useState('');
+  const [groqModel, setGroqModel] = useState('qwen/qwen3.8-27b');
+  const [availableGroqModels, setAvailableGroqModels] = useState<string[]>([]);
+  const [groqFont, setGroqFont] = useState("'Caveat', cursive, sans-serif");
+  const [hasGroqKey, setHasGroqKey] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testMessage, setTestMessage] = useState('');
+  const [showKeyText, setShowKeyText] = useState(false);
+
+  // Sync stored Groq configuration on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedKey = localStorage.getItem('groq_api_key') || '';
+    let storedModel = localStorage.getItem('groq_model') || 'qwen/qwen3.8-27b';
+    // Auto-migrate decommissioned preview model IDs
+    if (storedModel.includes('llama-3.2-11b') || storedModel.includes('llama-3.2-90b')) {
+      storedModel = 'qwen/qwen3.8-27b';
+      localStorage.setItem('groq_model', storedModel);
+    }
+    const storedFont = localStorage.getItem('groq_font') || "'Caveat', cursive, sans-serif";
+    setGroqApiKey(storedKey);
+    setGroqModel(storedModel);
+    setGroqFont(storedFont);
+    setHasGroqKey(storedKey.trim().length > 0);
+  }, []);
+
+  const handleSaveGroqSettings = (keyToSave?: string) => {
+    const key = keyToSave !== undefined ? keyToSave : groqApiKey;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('groq_api_key', key.trim());
+      localStorage.setItem('groq_model', groqModel);
+      localStorage.setItem('groq_font', groqFont);
+    }
+    setHasGroqKey(key.trim().length > 0);
+    setIsGroqSettingsOpen(false);
+  };
+
+  const handleTestGroqConnection = async () => {
+    if (!groqApiKey.trim()) {
+      setTestStatus('error');
+      setTestMessage('Please enter an API key before testing.');
+      return;
+    }
+    setTestStatus('testing');
+    setTestMessage('Testing connection to Groq API...');
+    const startTime = performance.now();
+    try {
+      const res = await fetch('/api/ai/handwriting-to-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          testOnly: true,
+          apiKey: groqApiKey.trim(),
+        }),
+      });
+      const data = await res.json();
+      const elapsed = Math.round(performance.now() - startTime);
+      if (res.ok && data.success) {
+        setTestStatus('success');
+        setTestMessage(`Verified! Connected to Groq Cloud (${elapsed}ms).`);
+        if (Array.isArray(data.availableModels) && data.availableModels.length > 0) {
+          setAvailableGroqModels(data.availableModels);
+        }
+      } else {
+        setTestStatus('error');
+        setTestMessage(data.message || 'Verification failed. Check your API key.');
+      }
+    } catch (err: unknown) {
+      setTestStatus('error');
+      setTestMessage(err instanceof Error ? err.message : 'Network error testing connection.');
+    }
+  };
+
+  const handleConvertHandwriting = async () => {
+    if (!hasGroqKey && !groqApiKey.trim()) {
+      setIsGroqSettingsOpen(true);
+      return;
+    }
+    if (canvasRef.current) {
+      await canvasRef.current.convertSelectedToText();
+    }
+  };
 
   const canvasRef = useRef<DrawingCanvasHandle | null>(null);
   const toolbarRef = useRef<HTMLElement | null>(null);
@@ -163,17 +250,19 @@ export default function WhiteboardPage() {
     };
   }, [isMoreToolsOpen, isToolbarExpanded]);
 
-  // Keyboard tool switching: 1 / P for pen, 2 / H for highlighter, 3 / E for eraser, 4 / V for hand
+  // Keyboard tool switching: V/S for select, 1/P for pen, 2/H for highlighter, 3/E for eraser, 4/Space for hand
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
         return;
       }
+      if (e.key === 'v' || e.key === 'V' || e.key === 's' || e.key === 'S') activateTool('select');
+      if (e.key === 'a' || e.key === 'A') activateTool('ai-lasso');
       if (e.key === '1' || e.key.toLowerCase() === 'p') activateTool('pen');
       if (e.key === '2' || e.key.toLowerCase() === 'h') activateTool('highlighter');
       if (e.key === '3' || e.key.toLowerCase() === 'e') activateTool('eraser');
-      if (e.key === '4' || e.key.toLowerCase() === 'v') activateTool('hand');
+      if (e.key === '4') activateTool('hand');
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -182,6 +271,29 @@ export default function WhiteboardPage() {
 
   const zoomPercent = Math.round(camera.zoom * 100);
   const toolbarTools = [
+    {
+      type: 'select' as const,
+      label: 'Select',
+      shortcut: 'V or S',
+      icon: (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+          <path d="M13 13l6 6" />
+        </svg>
+      ),
+    },
+    {
+      type: 'ai-lasso' as const,
+      label: 'AI Convert',
+      shortcut: 'A',
+      icon: (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="m14 14-8 8-4-4 8-8 4 4z" />
+          <path d="m13 9 3 3" />
+          <path d="M19 6V2m0 4v4m-4-2h4m0 0h4" />
+        </svg>
+      ),
+    },
     {
       type: 'hand' as const,
       label: 'Hand',
@@ -297,6 +409,38 @@ export default function WhiteboardPage() {
         <span style={{ fontSize: 12, color: '#515e7c' }}>
           {strokeCount} {strokeCount === 1 ? 'stroke' : 'strokes'}
         </span>
+        <div style={{ width: 1, height: 16, backgroundColor: '#e2e8f0' }} />
+        <button
+          type="button"
+          onClick={() => setIsGroqSettingsOpen(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            color: hasGroqKey ? '#005e4b' : '#9a3412',
+            backgroundColor: hasGroqKey ? '#e6f4ea' : '#ffedd5',
+            padding: '3px 10px',
+            borderRadius: 9999,
+            fontWeight: 600,
+            border: hasGroqKey ? '1px solid #bbf7d0' : '1px solid #fed7aa',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          title="Click to configure Groq Vision API Key & handwriting settings"
+        >
+          <span>⚡</span>
+          <span>Groq AI: {hasGroqKey ? 'Ready' : 'Set API Key'}</span>
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              backgroundColor: hasGroqKey ? '#16a34a' : '#ea580c',
+              boxShadow: hasGroqKey ? '0 0 6px #16a34a' : 'none',
+            }}
+          />
+        </button>
       </header>
 
       {/* Floating Bottom Left: Zoom & Vertical Control Tools */}
@@ -539,6 +683,9 @@ export default function WhiteboardPage() {
         camera={camera}
         onCameraChange={setCamera}
         onStrokesChange={handleStrokesChange}
+        autoShapeDetection={isAutoShapeEnabled}
+        onOpenSettings={() => setIsGroqSettingsOpen(true)}
+        onTranscribingChange={setIsTranscribing}
         className="w-full h-full"
       />
 
@@ -652,7 +799,7 @@ export default function WhiteboardPage() {
 
         <button
           type="button"
-          className={`toolbar-more-button${['rectangle', 'ellipse', 'line', 'arrow', 'bucket'].includes(tool) ? ' active' : ''}`}
+          className={`toolbar-more-button${['rectangle', 'ellipse', 'line', 'arrow', 'triangle', 'bucket'].includes(tool) ? ' active' : ''}`}
           aria-label="More drawing tools"
           aria-expanded={isMoreToolsOpen}
           aria-controls="toolbar-more-menu"
@@ -669,6 +816,57 @@ export default function WhiteboardPage() {
             <path d="M15 15h5M17.5 12.5v5" />
           </svg>
           <span>More</span>
+        </button>
+
+        <button
+          type="button"
+          className={`toolbar-tool${isAutoShapeEnabled ? ' auto-shape-active' : ''}`}
+          aria-label="Toggle auto shape detection"
+          title={`Auto Shape Snapping (${isAutoShapeEnabled ? 'ON' : 'OFF'})`}
+          onClick={() => setIsAutoShapeEnabled((prev) => !prev)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '0 8px',
+            color: isAutoShapeEnabled ? '#253481' : '#64748b',
+            backgroundColor: isAutoShapeEnabled ? '#eff4ff' : 'transparent',
+            fontWeight: 600,
+            fontSize: 11,
+            borderRadius: 10,
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          <span>{isAutoShapeEnabled ? 'Auto Shape: ON' : 'Shape: OFF'}</span>
+        </button>
+
+        {/* Dedicated AI Handwriting to Text Trigger */}
+        <button
+          type="button"
+          className="toolbar-tool ai-convert-btn"
+          aria-label="Convert handwriting to text"
+          title="Convert handwriting or selection to styled text using Groq Vision AI"
+          disabled={isTranscribing}
+          onClick={handleConvertHandwriting}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '0 10px',
+            background: isTranscribing ? '#94a3b8' : 'linear-gradient(135deg, #253481 0%, #3b82f6 100%)',
+            color: '#ffffff',
+            fontWeight: 600,
+            fontSize: 11,
+            borderRadius: 10,
+            border: 'none',
+            cursor: isTranscribing ? 'wait' : 'pointer',
+            boxShadow: '0 2px 6px rgba(37, 52, 129, 0.25)',
+          }}
+        >
+          <span>✨</span>
+          <span>{isTranscribing ? 'Transcribing...' : 'Convert to Text'}</span>
         </button>
 
         <div className="toolbar-divider" aria-hidden="true" />
@@ -817,6 +1015,7 @@ export default function WhiteboardPage() {
               {[
                 { type: 'rectangle' as const, label: 'Rectangle', icon: <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1" /></svg> },
                 { type: 'ellipse' as const, label: 'Ellipse', icon: <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="6" /></svg> },
+                { type: 'triangle' as const, label: 'Triangle', icon: <svg viewBox="0 0 24 24"><polygon points="12,4 21,20 3,20" stroke="currentColor" strokeWidth="2" fill="none" /></svg> },
                 { type: 'line' as const, label: 'Line', icon: <svg viewBox="0 0 24 24"><path d="M5 19 19 5" /></svg> },
                 { type: 'arrow' as const, label: 'Arrow', icon: <svg viewBox="0 0 24 24"><path d="M5 19 19 5M9 5h10v10" /></svg> },
                 { type: 'bucket' as const, label: 'Bucket fill', icon: <svg viewBox="0 0 24 24"><path d="m5 12 7-8 7 8-7 8z" /><path d="M18 17c0-1 1-2 1-2s1 1 1 2a1 1 0 0 1-2 0Z" /><path d="M4 21h16" /></svg> },
@@ -866,6 +1065,303 @@ export default function WhiteboardPage() {
           </section>
         )}
       </nav>
+
+      {/* Groq Vision AI Settings Modal */}
+      {isGroqSettingsOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="groq-settings-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            backgroundColor: 'rgba(13, 28, 46, 0.45)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            animation: 'fadeIn 0.15s ease-out',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              backgroundColor: '#ffffff',
+              borderRadius: 16,
+              padding: 24,
+              boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.25)',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: '#eff4ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 18,
+                  }}
+                >
+                  ⚡
+                </div>
+                <div>
+                  <h3 id="groq-settings-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d1c2e' }}>
+                    Groq Vision AI Settings
+                  </h3>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    Sub-second handwriting, equation & diagram recognition
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGroqSettingsOpen(false)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: 20,
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  lineHeight: 1,
+                  padding: 4,
+                }}
+                aria-label="Close settings"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* API Key Input Section */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label htmlFor="groq-api-key" style={{ fontSize: 12, fontWeight: 600, color: '#0d1c2e' }}>
+                Groq API Key
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <input
+                    id="groq-api-key"
+                    type={showKeyText ? 'text' : 'password'}
+                    placeholder="gsk_..."
+                    value={groqApiKey}
+                    onChange={(e) => {
+                      setGroqApiKey(e.target.value);
+                      setTestStatus('idle');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 36px 9px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      fontSize: 13,
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyText((prev) => !prev)}
+                    title={showKeyText ? 'Hide Key' : 'Show Key'}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#64748b',
+                    }}
+                  >
+                    {showKeyText ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTestGroqConnection}
+                  disabled={testStatus === 'testing' || !groqApiKey.trim()}
+                  style={{
+                    padding: '0 14px',
+                    borderRadius: 8,
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: testStatus === 'testing' ? '#f1f5f9' : '#f8fafc',
+                    color: '#0d1c2e',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: testStatus === 'testing' || !groqApiKey.trim() ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                </button>
+              </div>
+
+              {/* Status Banner */}
+              {testStatus !== 'idle' && (
+                <div
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    backgroundColor: testStatus === 'success' ? '#f0fdf4' : testStatus === 'error' ? '#fef2f2' : '#eff6ff',
+                    color: testStatus === 'success' ? '#166534' : testStatus === 'error' ? '#991b1b' : '#1e40af',
+                    border: `1px solid ${testStatus === 'success' ? '#bbf7d0' : testStatus === 'error' ? '#fecaca' : '#bfdbfe'}`,
+                  }}
+                >
+                  {testMessage}
+                </div>
+              )}
+
+              <span style={{ fontSize: 11, color: '#64748b' }}>
+                Your key is stored safely in your local browser storage. Don&apos;t have one? Get a free key at{' '}
+                <a
+                  href="https://console.groq.com/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#253481', fontWeight: 600, textDecoration: 'underline' }}
+                >
+                  console.groq.com/keys
+                </a>
+              </span>
+            </div>
+
+            {/* Model & Font Settings */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label htmlFor="groq-model" style={{ fontSize: 12, fontWeight: 600, color: '#0d1c2e' }}>
+                  Vision Model
+                </label>
+                <select
+                  id="groq-model"
+                  value={groqModel}
+                  onChange={(e) => setGroqModel(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
+                    fontSize: 12,
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="qwen/qwen3.8-27b">Qwen 3.8 27B Vision (Active, Recommended)</option>
+                  <option value="qwen/qwen3.6-27b">Qwen 3.6 27B Vision</option>
+                  <option value="meta-models/muse-spark-open">Muse Spark Open (Meta MoE Vision)</option>
+                  <option value="meta-llama/llama-4-scout-17b-preview">Llama 4 Scout 17B (Preview)</option>
+                  {availableGroqModels
+                    .filter((m) => !['qwen/qwen3.8-27b', 'qwen/qwen3.6-27b', 'meta-models/muse-spark-open', 'meta-llama/llama-4-scout-17b-preview'].includes(m))
+                    .map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label htmlFor="groq-font" style={{ fontSize: 12, fontWeight: 600, color: '#0d1c2e' }}>
+                  Handwriting Font Style
+                </label>
+                <select
+                  id="groq-font"
+                  value={groqFont}
+                  onChange={(e) => setGroqFont(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
+                    fontSize: 12,
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="'Caveat', cursive, sans-serif">Caveat (Organic Cursive)</option>
+                  <option value="'Patrick Hand', cursive, sans-serif">Patrick Hand (Architect Marker)</option>
+                  <option value="Inter, sans-serif">Inter (Clean Modern)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Live Font Preview Box */}
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 8,
+                backgroundColor: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}
+            >
+              <span style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                Output Font Preview
+              </span>
+              <span
+                style={{
+                  fontFamily: groqFont,
+                  fontSize: 22,
+                  color: '#253481',
+                  lineHeight: 1.2,
+                }}
+              >
+                ax² + bx + c = 0 (Quadratic Formula)
+              </span>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => setIsGroqSettingsOpen(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: '#64748b',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveGroqSettings()}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: '#253481',
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(37, 52, 129, 0.25)',
+                }}
+              >
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

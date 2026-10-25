@@ -27,6 +27,23 @@ export function getStrokeBounds(
   const scaleX = isNormalized ? canvasWidth : 1;
   const scaleY = isNormalized ? canvasHeight : 1;
 
+  if (stroke.text && pts.length > 0) {
+    const origin = pts[0];
+    const originX = origin.x * scaleX;
+    const originY = origin.y * scaleY;
+    const fontSize = stroke.fontSize || Math.max(18, stroke.size * 4.5);
+    const lines = stroke.text.split('\n');
+    const maxLineLen = Math.max(...lines.map((l) => l.length), 1);
+    const approxWidth = maxLineLen * fontSize * 0.65;
+    const approxHeight = lines.length * fontSize * 1.35;
+    return {
+      minX: originX - 4,
+      minY: originY - 4,
+      maxX: originX + approxWidth + 4,
+      maxY: originY + approxHeight + 4,
+    };
+  }
+
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;

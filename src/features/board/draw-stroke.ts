@@ -227,6 +227,11 @@ function drawShape(
     ctx.rect(left, top, width, height);
   } else if (shape === 'ellipse') {
     ctx.ellipse(left + width / 2, top + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+  } else if (shape === 'triangle') {
+    ctx.moveTo(left + width / 2, top);
+    ctx.lineTo(left + width, top + height);
+    ctx.lineTo(left, top + height);
+    ctx.closePath();
   } else {
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
@@ -246,7 +251,7 @@ function drawShape(
     }
   }
 
-  if (fillColor && (shape === 'rectangle' || shape === 'ellipse')) {
+  if (fillColor && (shape === 'rectangle' || shape === 'ellipse' || shape === 'triangle')) {
     ctx.fillStyle = fillColor;
     ctx.fill();
   }
@@ -288,6 +293,22 @@ export function renderStrokeWorld(
   if (stroke.points.length === 0) return;
 
   ctx.save();
+  if (stroke.text) {
+    ctx.fillStyle = stroke.color;
+    const fontSize = stroke.fontSize || Math.max(18, stroke.size * 4.5);
+    const fontFamily = stroke.fontFamily || "'Caveat', 'Patrick Hand', cursive, sans-serif";
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.textBaseline = 'top';
+    const lines = stroke.text.split('\n');
+    const lineHeight = fontSize * 1.35;
+    const origin = stroke.points[0] || { x: 0, y: 0 };
+    lines.forEach((line, idx) => {
+      ctx.fillText(line, origin.x, origin.y + idx * lineHeight);
+    });
+    ctx.restore();
+    return;
+  }
+
   if (stroke.shape) {
     const [start, end] = stroke.points;
     drawShape(ctx, stroke.shape, start, end, stroke.color, stroke.size, stroke.fillColor);
@@ -389,6 +410,24 @@ export function renderStroke(
   }
 
   ctx.save();
+  if (stroke.text) {
+    ctx.fillStyle = stroke.color;
+    const fontSize = stroke.fontSize || Math.max(18, stroke.size * 4.5);
+    const fontFamily = stroke.fontFamily || "'Caveat', 'Patrick Hand', cursive, sans-serif";
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.textBaseline = 'top';
+    const lines = stroke.text.split('\n');
+    const lineHeight = fontSize * 1.35;
+    const origin = stroke.points[0] || { x: 0, y: 0 };
+    const originX = origin.x * (canvasWidth || 1);
+    const originY = origin.y * (canvasHeight || 1);
+    lines.forEach((line, idx) => {
+      ctx.fillText(line, originX, originY + idx * lineHeight);
+    });
+    ctx.restore();
+    return;
+  }
+
   if (stroke.shape) {
     const [start, end] = stroke.points;
     drawShape(

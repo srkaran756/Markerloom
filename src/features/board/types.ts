@@ -2,8 +2,8 @@
  * Tool types supported by Markerloom board engine.
  * 'hand' is a panning navigation tool.
  */
-export type ShapeType = 'rectangle' | 'ellipse' | 'line' | 'arrow';
-export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'hand' | ShapeType | 'bucket';
+export type ShapeType = 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'triangle';
+export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'hand' | ShapeType | 'bucket' | 'select' | 'ai-lasso';
 
 /**
  * Camera / Viewport state for infinite canvas navigation.
@@ -58,6 +58,9 @@ export interface Stroke {
   shape?: ShapeType;
   fillColor?: string;
   createdAt?: number;
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
 }
 
 /**
@@ -104,6 +107,14 @@ export interface DrawingCanvasProps {
   className?: string;
   /** Optional override for stroke geometry parameters. */
   strokeConfig?: Partial<StrokeConfig>;
+  /** Enable automatic scribble-to-shape detection on pen strokes */
+  autoShapeDetection?: boolean;
+  /** Selection change callback */
+  onSelectionChange?: (selectedIds: string[]) => void;
+  /** Optional callback to open Groq AI settings modal */
+  onOpenSettings?: () => void;
+  /** Optional callback tracking whether AI transcription is currently in progress */
+  onTranscribingChange?: (transcribing: boolean) => void;
 }
 
 /**
@@ -149,7 +160,8 @@ export function isValidStroke(stroke: unknown): stroke is Stroke {
     s.shape !== 'rectangle' &&
     s.shape !== 'ellipse' &&
     s.shape !== 'line' &&
-    s.shape !== 'arrow'
+    s.shape !== 'arrow' &&
+    s.shape !== 'triangle'
   ) {
     return false;
   }
@@ -174,6 +186,15 @@ export function isValidStroke(stroke: unknown): stroke is Stroke {
     }
   }
   if (s.createdAt !== undefined && (typeof s.createdAt !== 'number' || !Number.isFinite(s.createdAt))) {
+    return false;
+  }
+  if (s.text !== undefined && typeof s.text !== 'string') {
+    return false;
+  }
+  if (s.fontSize !== undefined && (typeof s.fontSize !== 'number' || !Number.isFinite(s.fontSize) || s.fontSize <= 0)) {
+    return false;
+  }
+  if (s.fontFamily !== undefined && typeof s.fontFamily !== 'string') {
     return false;
   }
   return true;
